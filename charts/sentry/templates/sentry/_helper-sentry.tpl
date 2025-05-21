@@ -351,27 +351,27 @@ sentry.conf.py: |-
       # This is needed to prevent https://git.io/fj7Lw
       "uwsgi-socket": None,
       # Keep this between 15s-75s as that's what Relay supports
-      "http-keepalive": {{ .Values.config.web.httpKeepalive }},
-      "http-chunked-input": True,
+      "http-keepalive": {{ .Values.config.web.httpKeepalive | int }},
+      "http-chunked-input": {{ .Values.config.web.httpChunkedInput | ternary "True" "False" }},
       # the number of web workers
-      'workers': 3,
+      'workers': {{ .Values.config.web.workers | int }},
       # Turn off memory reporting
-      "memory-report": False,
+      "memory-report": {{ .Values.config.web.memoryReport | ternary "True" "False" }},
       # Some stuff so uwsgi will cycle workers sensibly
-      'max-requests': {{ .Values.config.web.maxRequests }},
-      'max-requests-delta': {{ .Values.config.web.maxRequestsDelta }},
-      'max-worker-lifetime': {{ .Values.config.web.maxWorkerLifetime }},
+      'max-requests': {{ .Values.config.web.maxRequests | int }},
+      'max-requests-delta': {{ .Values.config.web.maxRequestsDelta | int }},
+      'max-worker-lifetime': {{ .Values.config.web.maxWorkerLifetime | int }},
       # Duplicate options from sentry default just so we don't get
       # bit by sentry changing a default value that we depend on.
-      'thunder-lock': True,
-      'log-x-forwarded-for': False,
-      'buffer-size': 32768,
-      'limit-post': 209715200,
-      'disable-logging': True,
-      'reload-on-rss': 600,
-      'ignore-sigpipe': True,
-      'ignore-write-errors': True,
-      'disable-write-exception': True,
+      'thunder-lock': {{ .Values.config.web.thunderLock | ternary "True" "False" }},
+      'log-x-forwarded-for': {{ .Values.config.web.logXForwardedFor | ternary "True" "False" }},
+      'buffer-size': {{ .Values.config.web.bufferSize | int }},
+      'limit-post': {{ .Values.config.web.limitPost | int }},
+      'disable-logging': {{ .Values.config.web.disableLogging | ternary "True" "False" }},
+      'reload-on-rss': {{ .Values.config.web.reloadOnRss | int }},
+      'ignore-sigpipe': {{ .Values.config.web.ignoreSignpipe | ternary "True" "False" }},
+      'ignore-write-errors': {{ .Values.config.web.ignoreWriteErrors | ternary "True" "False" }},
+      'disable-write-exception': {{ .Values.config.web.disableWriteException | ternary "True" "False" }},
   }
 
   ###########
