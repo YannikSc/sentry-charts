@@ -80,7 +80,7 @@ serviceAccount:
   automountServiceAccountToken: true
 
 vroom:
-  # annotations: {}
+  annotations: {}
   # args: []
   replicas: 1
   env: []
@@ -126,7 +126,7 @@ vroom:
   volumeMounts: []
 
 uptimeChecker:
-  # annotations: {}
+  annotations: {}
   # args: []
   replicas: 1
   env: []
@@ -151,7 +151,7 @@ uptimeChecker:
 
 relay:
   enabled: true
-  # annotations: {}
+  annotations: {}
   replicas: 1
   # args: []
   mode: managed
@@ -312,7 +312,7 @@ sentry:
 
   worker:
     enabled: true
-    # annotations: {}
+    annotations: {}
     replicas: 1
     # concurrency: 4
     env: []
@@ -355,7 +355,7 @@ sentry:
   workerEvents:
     ## If the number of exceptions increases, it is recommended to enable workerEvents
     enabled: false
-    # annotations: {}
+    annotations: {}
     queues: "events.save_event,post_process_errors"
     ## When increasing the number of exceptions and enabling workerEvents, it is recommended to increase the number of their replicas
     replicas: 1
@@ -394,7 +394,7 @@ sentry:
   # allows to dedicate some workers to specific queues
   workerTransactions:
     enabled: false
-    # annotations: {}
+    annotations: {}
     queues: "events.save_event_transaction,post_process_transactions"
     replicas: 1
     # concurrency: 4
@@ -1203,7 +1203,7 @@ sentry:
     # volumeMounts: []
     serviceAccount: {}
     # priorityClassName: ""
-    # annotations: {}
+    annotations: {}
     # podLabels: {}
     # affinity: {}
     # nodeSelector: {}
@@ -2105,7 +2105,7 @@ snuba:
     # sidecars: []
     # containerSecurityContext: {}
     # securityContext: {}
-    # annotations: {}
+    annotations: {}
     # volumeMounts: []
 
 hooks:
