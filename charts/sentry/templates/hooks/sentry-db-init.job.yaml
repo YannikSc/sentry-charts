@@ -78,6 +78,8 @@ spec:
 {{ toYaml .Values.hooks.securityContext | indent 8 }}
       {{- end }}
       {{- end }}
+      initContainers:
+{{ include "sentry.initContainer.nodestore-s3" . | indent 6 }}
       containers:
       - name: db-init-job
         image: "{{ template "sentry.image" . }}"
@@ -85,6 +87,7 @@ spec:
         command: ["sentry","upgrade","--noinput"]
         env:
 {{ include "sentry.env" . | indent 8 }}
+{{ include "sentry.env.nodestore-s3" . | indent 8 }}
         {{- if .Values.hooks.dbInit.env }}
 {{ toYaml .Values.hooks.dbInit.env | indent 8 }}
         {{- end }}
@@ -92,6 +95,7 @@ spec:
         - mountPath: /etc/sentry
           name: config
           readOnly: true
+{{ include "sentry.volumeMount.nodestore-s3" . | indent 8 }}
 {{- if .Values.hooks.dbInit.volumeMounts }}
 {{ toYaml .Values.hooks.dbInit.volumeMounts | indent 8 }}
 {{- end }}
@@ -111,6 +115,7 @@ spec:
       - name: config
         configMap:
           name: {{ template "sentry.fullname" . }}-sentry
+{{ include "sentry.volume.nodestore-s3" . | indent 6 }}
 {{- if .Values.hooks.dbInit.volumes }}
 {{ toYaml .Values.hooks.dbInit.volumes | indent 6 }}
 {{- end }}
