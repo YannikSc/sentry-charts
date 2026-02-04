@@ -169,9 +169,12 @@ Note: this table is incomplete, so have a look at the values.yaml in case you mi
 | images.snuba.imagePullSecrets | list | `[]` |  |
 | images.symbolicator.imagePullSecrets | list | `[]` |  |
 | images.vroom.imagePullSecrets | list | `[]` |  |
-| ingress.alb.httpRedirect | bool | `false` |  |
-| ingress.enabled | bool | `true` |  |
-| ingress.regexPathStyle | string | `"nginx"` |  |
+| ingress.annotations | object | `{"nginx.ingress.kubernetes.io/use-regex":"true","nginx.ingress.kubernetes.io/proxy-buffers-number":"4","nginx.ingress.kubernetes.io/proxy-buffer-size":"128k","nginx.ingress.kubernetes.io/proxy-busy-buffers-size":"256k"}` | Default ingress annotations (override per controller) |
+| ingress.enabled | bool | `false` |  |
+| ingress.ingressClassName | string | `"nginx"` |  |
+| ingress.pathRules | object | `{"nginx":[...],"traefik":[...],"alb":[...],"gce":[...]}` | Controller-specific path rules (see values.yaml for defaults) |
+| ingress.pathType | string | `"ImplementationSpecific"` |  |
+| ingress.regexPathStyle | string | `""` | Controller style for path rules (auto from ingressClassName if empty) |
 | ipv6 | bool | `false` |  |
 | kafka.controller.nodeSelector | object | `{}` |  |
 | kafka.controller.replicaCount | int | `3` |  |
@@ -341,15 +344,9 @@ Note: this table is incomplete, so have a look at the values.yaml in case you mi
 | nginx.customReadinessProbe.successThreshold | int | `1` |  |
 | nginx.customReadinessProbe.tcpSocket.port | string | `"http"` |  |
 | nginx.customReadinessProbe.timeoutSeconds | int | `3` |  |
-| nginx.enabled | bool | `true` |  |
-| nginx.existingServerBlockConfigmap | string | `"{{ template \"sentry.fullname\" . }}"` |  |
+| nginx.enabled | bool | `false` |  |
+| nginx.existingServerConfigConfigmap | string | `"{{ template \"sentry.fullname\" . }}"` |  |
 | nginx.extraLocationSnippet | bool | `false` |  |
-| nginx.metrics.serviceMonitor | object | `{}` |  |
-| nginx.nodeSelector | object | `{}` |  |
-| nginx.replicaCount | int | `1` |  |
-| nginx.resources | object | `{}` |  |
-| nginx.service.ports.http | int | `80` |  |
-| nginx.service.type | string | `"ClusterIP"` |  |
 | openai | object | `{}` |  |
 | pgbouncer.affinity | object | `{}` |  |
 | pgbouncer.authType | string | `"md5"` |  |
@@ -460,7 +457,6 @@ Note: this table is incomplete, so have a look at the values.yaml in case you mi
 | route.main.kind | string | `"HTTPRoute"` | Route kind (HTTPRoute, GRPCRoute, etc.) |
 | route.main.labels | object | `{}` | Labels for the HTTPRoute |
 | route.main.parentRefs | list | `[]` | Parent Gateway references (required when enabled) |
-| route.main.path | string | `"/"` | Base path prefix for subpath deployments |
 | revisionHistoryLimit | int | `10` |  |
 | sentry.billingMetricsConsumer.affinity | object | `{}` |  |
 | sentry.billingMetricsConsumer.autoscaling.enabled | bool | `false` |  |
@@ -1146,9 +1142,129 @@ Note: this table is incomplete, so have a look at the values.yaml in case you mi
 | vroom.persistence.size | string | `"10Gi"` | Size of vroom PVC |
 | vroom.persistence.storageClassName | string | `nil` | Storage class for vroom PVC |
 
-## NGINX and/or Ingress
+## Routing
 
-By default, NGINX is enabled to allow sending the incoming requests to [Sentry Relay](https://getsentry.github.io/relay/) or the Django backend depending on the path. When Sentry is meant to be exposed outside of the Kubernetes cluster, it is recommended to disable NGINX and let the Ingress do the same. It's recommended to go with the go to Ingress Controller, [NGINX Ingress](https://kubernetes.github.io/ingress-nginx/) but others should work as well.
+This chart supports **four mutually exclusive** exposure modes. **Enable exactly one**.
+All routing options are **disabled by default**, so you must choose and enable one:
+
+- Gateway API HTTPRoute (`route.main.enabled`)
+- Traefik IngressRoute (`traefikIngressRoute.enabled`)
+- Kubernetes Ingress (`ingress.enabled`)
+- In-cluster nginx reverse proxy Service (`nginx.enabled`)
+
+**Important:** Do **not** enable more than one of `ingress.enabled`, `route.main.enabled`, `traefikIngressRoute.enabled`, or `nginx.enabled`.
+In particular, running Kubernetes Ingress / Gateway API / Traefik **in front of** the in-cluster nginx (proxy chaining) is **discouraged**: it adds an extra hop, increases latency, and can reduce throughput.
+
+Sentry does not support subpath deployments; all routes assume the application is served at `/`.
+
+### Gateway API (HTTPRoute)
+
+The chart also supports [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/) HTTPRoute as an alternative to traditional Ingress.
+
+Ingestion endpoints (`/api/*`) are routed to Relay, while UI and other API endpoints go to the web service (`/api/store` goes to Relay).
+
+```yaml
+route:
+  main:
+    enabled: true
+    hostnames:
+      - sentry.example.com
+    parentRefs:
+      - name: my-gateway
+        namespace: default
+```
+
+With HTTP to HTTPS redirect:
+
+```yaml
+route:
+  main:
+    enabled: true
+    hostnames:
+      - sentry.example.com
+    parentRefs:
+      - name: my-gateway
+        sectionName: https
+  httpRedirect:
+    enabled: true
+    parentRefs:
+      - name: my-gateway
+        sectionName: http
+```
+
+### Traefik IngressRoute
+
+If you run Traefik, you can enable the bundled `IngressRoute` resources instead of standard Ingress.
+
+The Traefik routes use `traefikIngressRoute.hostname` (defaults to `ingress.hostname`).
+
+```yaml
+traefikIngressRoute:
+  enabled: true
+  hostname: sentry.example.com
+  tls:
+    secretName: sentry-tls
+
+```
+
+### Kubernetes Ingress (nginx, traefik, AWS ALB, GCE)
+
+Routing rules are defined by `ingress.pathRules`, keyed by controller style. The controller style is selected by `ingress.ingressClassName`; for custom class names, set `ingress.regexPathStyle` to one of `nginx`, `traefik`, `alb`, or `gce`.
+
+Defaults target nginx-ingress. If you override `ingress.annotations`, keep `nginx.ingress.kubernetes.io/use-regex: "true"` for nginx.
+If you need per-path annotations or extra routing rules, create additional Ingress objects via `extraManifests`.
+
+For AWS ALB HTTPS redirect, set these annotations in `ingress.annotations`:
+
+```yaml
+ingress:
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+```
+
+If you are using `additionalHostNames`, the `nginx.ingress.kubernetes.io/upstream-vhost` annotation might also come in handy.
+It sets the `Host` header to the value you provide to avoid CSRF issues.
+
+#### Letsencrypt on NGINX Ingress Controller
+
+```yaml
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hostname: fqdn
+  ingressClassName: "nginx"
+  tls:
+    - secretName: sentry-tls
+      hosts:
+        - fqdn
+```
+
+
+### NGINX service
+
+If you prefer a single in-cluster Service as the HTTP entrypoint (for example to attach a `LoadBalancer` directly, or to use nginx `location` snippets), you can enable the bundled nginx reverse proxy based on the CloudPirates `nginx` chart dependency.
+
+```yaml
+
+nginx:
+  enabled: true
+  # Optional: add extra nginx locations/snippets
+  # extraLocationSnippet: |
+  #   location /admin {
+  #     allow 1.2.3.4;
+  #     deny all;
+  #     proxy_pass http://sentry;
+  #   }
+```
+
+Notes:
+
+- When `nginx.enabled=true`, the chart creates an nginx config ConfigMap (see `templates/routing/nginx-config.yaml`) that proxies to `sentry-web` and, when enabled, to `relay` for ingestion endpoints.
+- Expose the `*-nginx` Service by configuring the nginx chart values (for example `nginx.service.type=LoadBalancer`).
+- Using an additional router in front of this in-cluster nginx is discouraged (see warning above).
+
 
 ## Sentry secret key
 

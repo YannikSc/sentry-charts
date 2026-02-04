@@ -16,11 +16,29 @@ helm install my-sentry sentry/sentry --wait --timeout=1000s
 
 ## Values
 
-For now the full list of values is not documented, but you can get inspired by the `values.yaml` specific to each directory.
+Each chart has its own `README.md` in its directory with values and configuration instructions (for example `charts/sentry/README.md`).
+The changelog below refers to the main `sentry` chart only.
 
 ## Upgrading to Chart 29.x.x
 
-## External ClickHouse
+- Routing is now **opt-in**: all routing options are **disabled by default**. Choose and enable **exactly one** of `ingress.enabled`, `route.main.enabled`, `traefikIngressRoute.enabled`, or `nginx.enabled`.
+- When you use Kubernetes Ingress / Gateway API / Traefik, traffic is routed directly to `web`/`relay` to avoid an extra proxy hop and improve throughput.
+- Optional in-cluster NGINX service support is available via the CloudPirates `nginx` chart dependency. Enable it with `nginx.enabled=true` when you need a single service endpoint or nginx-specific routing snippets. Do not run another router in front of it.
+
+Migration guidance:
+
+- If you **do not** want an in-cluster nginx proxy, keep `nginx.enabled=false` and enable exactly one of `ingress.enabled`, `route.main.enabled`, or `traefikIngressRoute.enabled`.
+- If you **do** want an in-cluster nginx proxy, set `nginx.enabled=true` and keep `ingress.enabled`, `route.main.enabled`, and `traefikIngressRoute.enabled` disabled. Expose the `*-nginx` service directly (for example with `nginx.service.type=LoadBalancer`).
+- `ingress.alb.httpRedirect` was removed. For ALB HTTP→HTTPS redirect, set `alb.ingress.kubernetes.io/listen-ports` and `alb.ingress.kubernetes.io/ssl-redirect` in `ingress.annotations`.
+- Ingress templates now assume the stable `networking.k8s.io/v1` API.
+- Subpath routing options were removed (`route.main.path`, `traefikIngressRoute.path`); Sentry must be served at `/`.
+- If you previously relied on `nginx.extraLocationSnippet`, either keep using it with `nginx.enabled=true` or move the logic to ingress/controller configuration (annotations, controller ConfigMap) or dedicated routing objects via `extraManifests`.
+
+Nginx Ingress, Traefik Ingress, GCE and AWS ALB are currently supported, pull requests for other controllers are welcome!
+
+Routing changes: see the [routing section](charts/sentry/README.md#routing) for the supported modes and configuration details.
+
+### External ClickHouse
 
 Removed bundled ClickHouse. Use an external ClickHouse deployment and follow the [External ClickHouse guide](charts/sentry/docs/external-clickhouse.md).
 
@@ -315,7 +333,7 @@ As Relay is now part of this chart, you need to make sure you enable either Ngin
 
 If you are using an ingress gateway (like Istio), you have to change your inbound path from `sentry-web` to `nginx`.
 
-## Traffic Routing
+## NGINX and/or Ingress
 
 By default, NGINX is enabled to allow sending the incoming requests to [Sentry Relay](https://getsentry.github.io/relay/) or the Django backend depending on the path. When Sentry is meant to be exposed outside of the Kubernetes cluster, it is recommended to disable NGINX and let the Ingress do the same. It's recommended to go with the go-to Ingress Controller, [NGINX Ingress](https://kubernetes.github.io/ingress-nginx/), but others should work as well.
 
@@ -334,41 +352,6 @@ nginx:
     hostname: fqdn
     ingressClassName: "nginx"
     tls: true
-```
-
-### Gateway API
-
-This chart supports [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/) HTTPRoute as an alternative to traditional Ingress.
-
-```yaml
-nginx:
-  enabled: false
-route:
-  main:
-    enabled: true
-    hostnames:
-      - sentry.example.com
-    parentRefs:
-      - name: my-gateway
-        namespace: default
-```
-
-With HTTP to HTTPS redirect:
-
-```yaml
-route:
-  main:
-    enabled: true
-    hostnames:
-      - sentry.example.com
-    parentRefs:
-      - name: my-gateway
-        sectionName: https
-  httpRedirect:
-    enabled: true
-    parentRefs:
-      - name: my-gateway
-        sectionName: http
 ```
 
 ## ClickHouse warning

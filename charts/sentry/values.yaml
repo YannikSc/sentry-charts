@@ -2255,62 +2255,66 @@ openai: {}
 #   existingSecret: "xxxxx"
 #   existingSecretKey: ""               # by default "api-token"
 
-nginx:
-  enabled: true  # true, if Safari compatibility is needed
-  image:
-    repository: bitnamilegacy/nginx
-  containerPort: 8080
-  existingServerBlockConfigmap: '{{ template "sentry.fullname" . }}'
-  resources: {}
-  replicaCount: 1
-  nodeSelector: {}
-  tolerations: []
-  service:
-    type: ClusterIP
-    ports:
-      http: 80
-  extraLocationSnippet: false
-  customReadinessProbe:
-    tcpSocket:
-      port: http
-    initialDelaySeconds: 5
-    timeoutSeconds: 3
-    periodSeconds: 5
-    successThreshold: 1
-    failureThreshold: 3
-  # extraLocationSnippet: |
-  #  location /admin {
-  #    allow 1.2.3.4; # VPN network
-  #    deny all;
-  #    proxy_pass http://sentry;
-  #  }
-  # Use this to enable an extra service account
-  # serviceAccount:
-  #   create: false
-  #   name: nginx
-  metrics:
-    serviceMonitor: {}
-
 ingress:
-  enabled: true
-  # If you are using traefik ingress controller, switch this to 'traefik'
-  # if you are using AWS ALB Ingress controller, switch this to 'aws-alb'
-  # if you are using GKE Ingress controller, switch this to 'gke'
-  regexPathStyle: nginx
-  # ingressClassName: nginx
-  # If you are using AWS ALB Ingress controller, switch to true if you want activate the http to https redirection.
-  alb:
-    httpRedirect: false
+  enabled: false
+  ingressClassName: nginx
+  # Select the ingress controller path style (nginx, traefik, alb, gce).
+  # If empty, it is inferred from ingressClassName (defaults to nginx).
+  # For custom ingressClassName values, set regexPathStyle explicitly.
+  # Aliases: aws-alb -> alb, gke/gce-internal -> gce.
+  regexPathStyle: ""
+  pathType: ImplementationSpecific
   # Add custom labels for ingress resource
   # labels:
-  # annotations:
-  #   If you are using nginx ingress controller, please use at least those 2 annotations
-  #   kubernetes.io/ingress.class: nginx
-  #   nginx.ingress.kubernetes.io/use-regex: "true"
-  #   https://github.com/getsentry/self-hosted/issues/1927
-  #   nginx.ingress.kubernetes.io/proxy-buffers-number: "16"
-  #   nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
-  #
+  # Default annotations are tuned for nginx ingress; override for other controllers.
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "256k"
+    # Use below annotations to enable HTTP to HTTPS redirects on AWS ALB
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    # alb.ingress.kubernetes.io/ssl-redirect: '443'
+  # Default ingress path rules keyed by controller style.
+  # Override this when using a different controller or custom class name.
+  # Each rule supports: path, service (web|relay) and optional pathType.
+  pathRules:
+    nginx:
+      - path: /api/store
+        service: relay
+      - path: /api/[1-9][0-9]*/(.*)
+        service: relay
+      - path: /api/0/relays/(.*)
+        service: relay
+      - path: /
+        service: web
+    traefik:
+      - path: /api/store
+        service: relay
+      - path: /api/{[1-9][0-9]*}/{(.*)}
+        service: relay
+      - path: /api/0/relays/{(.*)}
+        service: relay
+      - path: /
+        service: web
+    alb:
+      - path: /api/0/relays/*
+        service: relay
+      - path: /api/0/*
+        service: web
+      - path: /api/*
+        service: relay
+      - path: /*
+        service: web
+    gce:
+      - path: /api/0/relays/*
+        service: relay
+      - path: /api/0/*
+        service: web
+      - path: /api/*
+        service: relay
+      - path: /*
+        service: web
   # hostname:
   # additionalHostNames: []
   #
@@ -2347,7 +2351,6 @@ traefikIngressRoute:
   # -- Route priority (higher = matched first)
   priority: 100
 
-
 # Kubernetes Gateway API HTTPRoute configuration
 # Configure gateway routes for the chart here. More routes can be added by adding
 # a dictionary key like the 'main' route.
@@ -2381,9 +2384,6 @@ route:
       #   namespace: default
       #   sectionName: https
 
-    # -- Base path prefix for all routes (for subpath deployments)
-    # Use this if Sentry is deployed at a subpath, e.g., "/sentry"
-    path: /
 
     # -- Additional custom rules to prepend
     additionalRules: []
@@ -2421,6 +2421,17 @@ route:
     # -- HTTP status code for redirect (301 = permanent, 302 = temporary)
     statusCode: 301
 
+# For other configuration options see: https://github.com/CloudPirates-io/helm-charts/tree/main/charts/nginx
+nginx:
+  enabled: false
+  existingServerConfigConfigmap: '{{ template "sentry.fullname" . }}'
+  extraLocationSnippet: false
+  # extraLocationSnippet: |
+  #  location /admin {
+  #    allow 1.2.3.4; # VPN network
+  #    deny all;
+  #    proxy_pass http://sentry;
+  #  }
 
 filestore:
   # Set to one of filesystem, gcs or s3 as supported by Sentry.
