@@ -18,19 +18,34 @@ The recommended way to deploy ClickHouse on Kubernetes is using the [Altinity Cl
 
 ### Prerequisites
 
-1.  **Install Altinity ClickHouse Operator**:
-    Follow the [official installation guide](https://github.com/Altinity/clickhouse-operator#quick-start).
+**Create a values file for the operator** and **install Altinity ClickHouse Operator**:
+```bash
+cat <<'EOF' > clickhouse-operator-values.yaml
+configs:
+  files:
+    config.yaml:
+      watch:
+        namespaces:
+          - sentry
+EOF
 
-    **Important**: By default, the operator might only watch for resources in its own namespace. If you deploy ClickHouse in a different namespace, you must configure the operator to watch that namespace or all namespaces.
-    
-    Example `values.yaml` for the operator to watch all namespaces:
-    ```yaml
-    configs:
-      files:
-        config.yaml:
-          watch:
-            namespaces: [""]
-    ```
+helm repo add clickhouse-operator https://helm.altinity.com
+helm repo update
+helm upgrade --install clickhouse-operator clickhouse-operator/altinity-clickhouse-operator \
+  --version 0.26.0 \
+  --namespace clickhouse-operator \
+  --create-namespace \
+  -f clickhouse-operator-values.yaml \
+  --wait
+```
+
+**Note**: Do not use `--set 'configs.files.config.yaml.watch.namespaces={sentry}'` — Helm interprets dots as nested keys, which creates a separate `config` file instead of modifying `config.yaml`, causing the operator to ignore the setting.
+
+**Verify the operator is running**:
+```bash
+kubectl -n clickhouse-operator get pods -l app.kubernetes.io/name=altinity-clickhouse-operator
+```
+Ensure the operator pod is in `Running` state before proceeding.
 
 ### MVP Deployment with ClickHouse Keeper
 
@@ -40,7 +55,8 @@ Below is a Minimum Viable Product (MVP) configuration for a single-node ClickHou
 
 Save this as `clickhouse.yaml`. This example deploys a single-node cluster.
 
-```yaml
+```bash
+cat <<'EOF' > clickhouse.yaml
 apiVersion: clickhouse.altinity.com/v1
 kind: ClickHouseInstallation
 metadata:
@@ -66,9 +82,21 @@ spec:
   defaults:
     templates:
       podTemplate: clickhouse-single-node
+EOF
 ```
 
 **Note on Network Access**: The `users/default/networks/ip` setting is crucial. By default, ClickHouse might restrict access. Setting it to `0.0.0.0/0` allows the Sentry pods (which have dynamic IPs) to connect.
+
+Apply the manifest and wait for ClickHouse to become ready:
+```bash
+kubectl create ns sentry
+kubectl apply -f clickhouse.yaml
+kubectl -n sentry get chi sentry-clickhouse -w
+```
+Wait until the `status.status` field shows `Completed` and the ClickHouse pods are `Running`:
+```bash
+kubectl -n sentry get pods -l clickhouse.altinity.com/chi=sentry-clickhouse
+```
 
 #### 2. (Optional) Separate ClickHouse Keeper
 
@@ -131,17 +159,27 @@ spec:
 
 Once your ClickHouse cluster is running, configure the Sentry Helm chart to use it.
 
-In your `values.yaml`:
+**Find the ClickHouse service name** created by the operator:
+```bash
+kubectl -n sentry get svc -l clickhouse.altinity.com/chi=sentry-clickhouse
+```
 
-```yaml
+The Altinity Operator creates services following this naming convention:
+- `clickhouse-sentry-clickhouse` — main load-balanced service (recommended for single-node setups)
+- `chi-sentry-clickhouse-single-node-0-0` — per-pod service for shard 0, replica 0
+
+**Create your `values.yaml`** using the service name from the command above:
+```bash
+cat <<'EOF' > values.yaml
 externalClickhouse:
-  host: "clickhouse-sentry-clickhouse.sentry.svc" # Service name of your CHI
+  host: "chi-sentry-clickhouse-single-node-0-0.sentry.svc.cluster.local"
   tcpPort: 9000
   httpPort: 8123
   username: "default"
   password: "" # Set if you configured a password
   database: "default"
   singleNode: true # Set to false if using a replicated cluster
+EOF
 ```
 
 ### Verification
@@ -153,7 +191,7 @@ After deployment, you can verify the connection by checking the logs of the `snu
 ```
 helm repo add sentry https://sentry-kubernetes.github.io/charts
 helm repo update
-helm install my-sentry sentry/sentry --wait --timeout=1000s
+helm install my-sentry sentry/sentry -f values.yaml --wait --timeout=1000s
 ```
 
 ## Values
