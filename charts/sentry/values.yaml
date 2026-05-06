@@ -3080,9 +3080,15 @@ externalKafka:
   ## When enabled, creates a Job that provisions Kafka topics
   provisioning:
     enabled: false
-    image:
-      repository: apache/kafka
-      tag: "3.7.1"
+    ## topicctl: uses segmentio/topicctl for declarative topic management
+    topicctl:
+      image:
+        repository: segment/topicctl
+        tag: "v2.0.2"
+      clusterName: "sentry-kafka"
+      environment: "default"
+      region: "default"
+      placementStrategy: "any"
     # topics: []  # If empty, uses kafka.provisioning.topics
     replicationFactor: 3
     numPartitions: 1

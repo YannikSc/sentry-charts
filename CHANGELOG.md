@@ -21,6 +21,33 @@ helm upgrade sentry sentry/sentry \
   --set user.existingSecret=sentry-admin-password
 ```
 
+**Breaking change:** bash-script Kafka topic provisioning for external Kafka has been replaced with `segmentio/topicctl` ([#2157](https://github.com/sentry-kubernetes/charts/pull/2157)).
+
+The `externalKafka.provisioning.image` block has been removed and replaced with `externalKafka.provisioning.topicctl`. Users who were using external Kafka provisioning must update their `values.yaml`:
+
+**Before:**
+```yaml
+externalKafka:
+  provisioning:
+    image:
+      repository: apache/kafka
+      tag: "latest"
+```
+
+**After:**
+```yaml
+externalKafka:
+  provisioning:
+    topicctl:
+      image:
+        repository: segment/topicctl
+        tag: "v2.0.2"
+      clusterName: "sentry-kafka"
+      environment: "default"
+      region: "default"
+      placementStrategy: "any"
+```
+
 ## Upgrading to Chart 30.x.x
 
 **Breaking change:** HTTP health probe tuning for in-cluster traffic is no longer a single set of flat `probe*` values.
