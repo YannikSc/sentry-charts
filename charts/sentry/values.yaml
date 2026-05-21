@@ -92,7 +92,7 @@ serviceAccount:
 
 vroom:
   annotations: {}
-  # args: []
+  args: []
   replicas: 1
   env: []
   # HTTP probes: liveness tolerates brief blips; readiness is stricter so Service endpoints drop faster.
@@ -117,7 +117,7 @@ vroom:
   securityContext: {}
   containerSecurityContext: {}
   # priorityClassName: ""
-  # topologySpreadConstraints: []
+  topologySpreadConstraints: []
   service:
     annotations: {}
   tolerations: []
@@ -153,13 +153,12 @@ vroom:
     # Only available with autoscaling/v2
     behavior: {}
   sidecars: []
-  # topologySpreadConstraints: []
   volumes: []
   volumeMounts: []
 
 uptimeChecker:
   annotations: {}
-  # args: []
+  args: []
   replicas: 1
   env: []
   resources: {}
@@ -177,7 +176,7 @@ uptimeChecker:
   # podLabels: {}
 
   sidecars: []
-  # topologySpreadConstraints: []
+  topologySpreadConstraints: []
   volumes: []
   volumeMounts: []
 
@@ -186,7 +185,7 @@ relay:
   annotations: {}
   strategyType: RollingUpdate
   replicas: 1
-  # args: []
+  args: []
   mode: managed
   env: []
   # HTTP probes: liveness tolerates brief blips; readiness is stricter so Service endpoints drop faster.
@@ -235,9 +234,9 @@ relay:
   volumeMounts: []
   init:
     resources: {}
-    # additionalArgs: []
+    additionalArgs: []
     # credentialsSubcommand: ""
-    # env: []
+    env: []
     volumes: []
     volumeMounts: []
   # cache:
@@ -2082,9 +2081,9 @@ snuba:
     # affinity: {}
     # nodeSelector: {}
     tolerations: []
-    # env: []
+    env: []
     volumes: []
-    # sidecars: []
+    sidecars: []
     # containerSecurityContext: {}
     # securityContext: {}
     annotations: {}
@@ -2269,7 +2268,7 @@ symbolicator:
 
     volumes: []
     volumeMounts: []
-    # sidecars: []
+    sidecars: []
 
 auth:
   register: true
