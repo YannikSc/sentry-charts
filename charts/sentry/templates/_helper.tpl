@@ -10,6 +10,33 @@
 {{- define "symbolicator.port" -}}3021{{- end -}}
 {{- define "vroom.port" -}}8085{{- end -}}
 
+{{/*
+  livenessProbe block for kafka-consumer / worker deployments that expose a
+  file-based healthcheck via `--healthcheck-file-path` / `--health-check-file`.
+
+  Arguments (dict):
+    livenessProbe:   the workload's .Values.<x>.livenessProbe value
+    healthcheckFile: file path (default: /tmp/health.txt)
+    freshnessSeconds: liveness treshold since last touch of healthcheckFile (default: 60)
+*/}}
+{{- define "sentry.livenessProbe.execHealthcheckFile" -}}
+{{- $probe := .livenessProbe -}}
+{{- if $probe.enabled -}}
+{{- $probeConfig := omit $probe "enabled" "freshnessSeconds" -}}
+{{- $file := default "/tmp/health.txt" .healthcheckFile -}}
+{{- $fresh := default 60 $probe.freshnessSeconds -}}
+livenessProbe:
+  exec:
+    command:
+      - sh
+      - -c
+      - 'test $(($(date +%s) - $(stat -c %Y {{ $file }} 2>/dev/null || echo 0))) -lt {{ $fresh }}'
+{{- with $probeConfig }}
+{{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end -}}
+{{- end -}}
+
 {{- define "relay.image" -}}
 {{- default "ghcr.io/getsentry/relay" .Values.images.relay.repository -}}
 :
