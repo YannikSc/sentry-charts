@@ -104,6 +104,10 @@ spec:
           {{- end }}
           - "--healthcheck-file-path"
           - "/tmp/health.txt"
+          {{- if .Values.sentry.postProcessForwardErrors.maxPollIntervalMs }}
+          - "--max-poll-interval-ms"
+          - "{{ .Values.sentry.postProcessForwardErrors.maxPollIntervalMs }}"
+          {{- end }}
         {{- include "sentry.startupProbe.execHealthcheckFile" (dict "startupProbe" .Values.sentry.postProcessForwardErrors.startupProbe "healthcheckFile" "/tmp/health.txt") | nindent 8 }}
         {{- include "sentry.livenessProbe.execHealthcheckFile" (dict "livenessProbe" .Values.sentry.postProcessForwardErrors.livenessProbe "healthcheckFile" "/tmp/health.txt") | nindent 8 }}
         env:

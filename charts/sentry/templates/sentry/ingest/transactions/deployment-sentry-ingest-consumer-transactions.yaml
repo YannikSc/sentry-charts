@@ -105,6 +105,10 @@ spec:
           {{- end }}
           - "--healthcheck-file-path"
           - "/tmp/health.txt"
+          {{- if .Values.sentry.ingestConsumerTransactions.maxPollIntervalMs }}
+          - "--max-poll-interval-ms"
+          - "{{ .Values.sentry.ingestConsumerTransactions.maxPollIntervalMs }}"
+          {{- end }}
           {{- if .Values.sentry.ingestConsumerTransactions.logLevel }}
           - "--log-level"
           - "{{ .Values.sentry.ingestConsumerTransactions.logLevel }}"

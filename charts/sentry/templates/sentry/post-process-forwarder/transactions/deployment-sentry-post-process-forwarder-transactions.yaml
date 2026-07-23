@@ -106,6 +106,10 @@ spec:
           {{- end }}
           - "--healthcheck-file-path"
           - "/tmp/health.txt"
+          {{- if .Values.sentry.postProcessForwardTransactions.maxPollIntervalMs }}
+          - "--max-poll-interval-ms"
+          - "{{ .Values.sentry.postProcessForwardTransactions.maxPollIntervalMs }}"
+          {{- end }}
           {{- if .Values.sentry.postProcessForwardTransactions.processes }}
           - "--"
           - "--mode"
