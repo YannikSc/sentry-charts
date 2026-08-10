@@ -142,7 +142,11 @@ startupProbe:
 {{- end -}}
 
 {{- define "launchpad.secretName" -}}
-{{- printf "%s-launchpad-secret" (include "sentry.fullname" .) -}}
+{{- default (printf "%s-launchpad-secret" (include "sentry.fullname" .)) .Values.launchpadTaskWorker.existingSecret -}}
+{{- end -}}
+
+{{- define "launchpad.secretKey" -}}
+{{- default "rpc-shared-secret" .Values.launchpadTaskWorker.existingSecretKey -}}
 {{- end -}}
 
 {{- define "launchpad.enabled" -}}
@@ -756,7 +760,7 @@ See: https://github.com/getsentry/taskbroker/blob/main/docs/kafka-config-migrati
   valueFrom:
     secretKeyRef:
       name: {{ include "launchpad.secretName" . }}
-      key: rpc-shared-secret
+      key: {{ include "launchpad.secretKey" . }}
 {{- end -}}
 
 {{- define "uptimeChecker.env" -}}
@@ -1182,7 +1186,7 @@ Launchpad RPC shared secret (required by Sentry web and launchpad-taskworker)
   valueFrom:
     secretKeyRef:
       name: {{ include "launchpad.secretName" . }}
-      key: rpc-shared-secret
+      key: {{ include "launchpad.secretKey" . }}
 {{- end }}
 {{- end -}}
 
